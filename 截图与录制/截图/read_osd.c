@@ -1,3 +1,4 @@
+/*本代码作用是快速读取 osd层数据，并保存到U盘中去*/
 static int ccc(int argc,char *argv[])
 {
     char *infile = NULL;
