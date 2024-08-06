@@ -199,13 +199,19 @@ static void uvc_cb(uvc_frame_t *frame, void *ptr)
         break;
     case UVC_COLOR_FORMAT_MJPEG:
         mjpg_decode(decode_hld, frame->data, frame->data_bytes, 0);
+        
         if (mjpeg_file) {
+            pthread_mutex_lock(&g_mutex);
             fwrite(frame->data, frame->data_bytes, 1, mjpeg_file);
+            pthread_mutex_unlock(&g_mutex);
         } 
        
         if(avi_file){
+            pthread_mutex_lock(&g_mutex);
             AVI_write_frame(avi_file,(char *)frame->data,frame->data_bytes,1);
+            pthread_mutex_unlock(&g_mutex);
         }
+        
         break;
     case UVC_COLOR_FORMAT_YUYV:
         break;
@@ -318,8 +324,8 @@ static void *open_camera(void *arg)
                 frame_desc->dwDefaultFrameInterval;
     }
     fps=30;
-    // width=640;
-    // height=480;
+    width=1280;
+    height=720;
     printf("\nFirst format: (%4s) %dx%d %dfps\n",format_desc->fourccFormat, width, height, fps);  //width、height是摄像头的分辨率，fps是帧率
 
     res = uvc_get_stream_ctrl_format_size(
@@ -483,6 +489,7 @@ static int camera_start_record(int argc,char *argv[])
  * *************************************************/
 static int camera_stop_record(int argc,char *argv[])
 {   
+    pthread_mutex_lock(&g_mutex);
 #if 0
     if(mjpeg_file){
         if (fclose(mjpeg_file) == 0) {
@@ -497,7 +504,8 @@ static int camera_stop_record(int argc,char *argv[])
         AVI_close(avi_file);
         avi_file=NULL;
     }
-    #endif
+#endif
+    pthread_mutex_unlock(&g_mutex);
 }
 
 /***************************************************
@@ -955,7 +963,7 @@ static int animation_effect(void)
     int height_one_tenth=0;
     
     osd_zoom_animation(dis_area.area.w/4,dis_area.area.h/4,animation_width,animation_height);
-    usleep(100*1000);
+    usleep(10*1000);
     for(i=0;i<9;i++){
         printf("\n i=%d \n",i);
         
@@ -971,7 +979,7 @@ static int animation_effect(void)
         printf("x =%d\n",x);
         printf("y =%d\n",y);
         osd_zoom_animation(x,y,animation_width,animation_height);
-        usleep(100*1000);
+        usleep(10*1000);
     }
 
     memset(&msg_ret, 0, sizeof(control_msg_t));
@@ -987,7 +995,7 @@ static int animation_effect(void)
 
     osd_zoom_animation(0,0,dis_area.area.w,dis_area.area.h);
 
-    printf("exit animation_effect");
+    printf("exit animation_effect \n");
 }
 /***************************************************
  * 函数原型：static int screenshot(int argc,char *argv[])
