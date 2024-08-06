@@ -63,6 +63,7 @@ static unsigned char *dis_buf2=NULL;
 static unsigned char *osd_dis_buf=NULL;
 static unsigned char *bmp_buf = NULL;
 static lv_img_dsc_t bmp_src;
+static bool write_flag=false;
 
 static uint32_t dis_width;
 static uint32_t dis_height;
@@ -199,19 +200,16 @@ static void uvc_cb(uvc_frame_t *frame, void *ptr)
         break;
     case UVC_COLOR_FORMAT_MJPEG:
         mjpg_decode(decode_hld, frame->data, frame->data_bytes, 0);
+	if(write_flag == true){
+            if (mjpeg_file) {
+                fwrite(frame->data, frame->data_bytes, 1, mjpeg_file);
+            } 
         
-        if (mjpeg_file) {
-            pthread_mutex_lock(&g_mutex);
-            fwrite(frame->data, frame->data_bytes, 1, mjpeg_file);
-            pthread_mutex_unlock(&g_mutex);
-        } 
-       
-        if(avi_file){
-            pthread_mutex_lock(&g_mutex);
-            AVI_write_frame(avi_file,(char *)frame->data,frame->data_bytes,1);
-            pthread_mutex_unlock(&g_mutex);
+            if(avi_file){
+                AVI_write_frame(avi_file,(char *)frame->data,frame->data_bytes,1);
+            }
         }
-        
+	
         break;
     case UVC_COLOR_FORMAT_YUYV:
         break;
@@ -476,6 +474,7 @@ static int camera_start_record(int argc,char *argv[])
     }
     AVI_set_video(avi_file, 1280, 720, 30.000, "mjpg");
     #endif
+    write_flag=true;
 }
 
 
@@ -489,7 +488,7 @@ static int camera_start_record(int argc,char *argv[])
  * *************************************************/
 static int camera_stop_record(int argc,char *argv[])
 {   
-    pthread_mutex_lock(&g_mutex);
+    write_flag=false;
 #if 0
     if(mjpeg_file){
         if (fclose(mjpeg_file) == 0) {
@@ -505,7 +504,6 @@ static int camera_stop_record(int argc,char *argv[])
         avi_file=NULL;
     }
 #endif
-    pthread_mutex_unlock(&g_mutex);
 }
 
 /***************************************************
