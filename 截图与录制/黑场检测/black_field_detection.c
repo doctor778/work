@@ -1,7 +1,6 @@
 #ifdef __linux__
 #include <signal.h>
 #include <termios.h>
-#include "console.h"
 #else
 #include <kernel/lib/console.h>
 #endif
@@ -23,11 +22,10 @@
 
 #define DIS_DEV      "/dev/dis"
 #define TILE_ROW_SWIZZLE_MASK 3
-#define sampleValue  50     //42000 us   抽样检测的范围，用户自己设定
-// #define sampleValue  200  //54000 us
-#define BLACK_THRESHOLD 32     //判定黑色的标准，用户自己设定
+#define sampleValue  50     //   抽样检测的范围，用户自己设定
+#define BLACK_THRESHOLD 25 //判定黑色的标准，用户自己设定
 #define FRAME_DELAY 3   //帧间延时时长，用户自己设定
-static unsigned char *dis_buf = NULL;  //从DE上获取到的数据格式是 BGRA      获取到的像素排列顺序跟看到的图片一致，从左至右，从上至下
+static unsigned char *dis_buf = NULL;  
 static uint32_t dis_width;
 static uint32_t dis_height;
 static uint32_t copy_c_buf_size;
@@ -288,7 +286,6 @@ static void get_screen_brightness(void)
 
     printf("eh.brightness =%d\n",eh.brightness);
     brightness_value=eh.brightness;
-    // brightness_value=100;
     close(fd);
 }
 
@@ -395,8 +392,7 @@ static int is_black(void)
     int y_1=(cell_height-dark_spot)/2; 
 
     bool black_flag =true;
-    long start_time=api_sys_clock_time_check_get(NULL);
-    for(int i =1;i<10;i++){
+    for(int i =1;i<10;i++){		//对一帧的数据进行抽样检测，检测是不是黑色。
         switch(i){
             case 1:
                 x=x_1;
@@ -438,28 +434,26 @@ static int is_black(void)
                 printf("switch error %s %d\n",__func__,__LINE__);
                 break;
         }
-        int ret=is_pixel_black(x,y);
+        int ret=is_pixel_black(x,y);	//判断这一块的数据是不是黑色
         if(ret <0){
             black_flag =false;
             break;
         }
     }
-    long end_time=api_sys_clock_time_check_get(NULL);
-    printf("end_time -start_time =%ld \n",end_time -start_time);
 
     if(black_flag == false){
         printf("Not a black field \n");
     }else{
         printf("is Black field \n");
-        int brightness=0;
-        set_screen_brightness(brightness);
+        int brightness=0;   //设置要降低的亮度值
+        set_screen_brightness(brightness);//降低亮度
     }
 }
 
 
 static void *blackout_check_thread(void *arg)
 {
-    get_screen_brightness();
+    get_screen_brightness();        //获取亮度
 
     int result=0;
     debounce_time=0;
@@ -472,15 +466,15 @@ static void *blackout_check_thread(void *arg)
             goto end;
         }
         
-        result=get_dis_layer_data();
+        result=get_dis_layer_data();                            //从DE获取一帧的数据
         if(result<0){
             printf("The video layer cannot obtain data \n");
             debounce_time=0;
-            restore_screen_brightness();
-            sleep(3);
+            restore_screen_brightness(); //亮度复原
+            sleep(FRAME_DELAY);
             continue;
         }
-        if(!prev_dis_buf){
+        if(!prev_dis_buf){          //第一次获取到帧
             prev_buf_size=dis_buf_size;
             prev_dis_buf=malloc(prev_buf_size);
             memset(prev_dis_buf, 0, prev_buf_size);
@@ -489,16 +483,16 @@ static void *blackout_check_thread(void *arg)
             memcpy(prev_dis_buf, dis_buf, prev_buf_size);
             printf("First data acquisition \n");
         }else{
-            if(prev_buf_size != dis_buf_size){
+            if(prev_buf_size != dis_buf_size){  //前一帧数据大小 不等于 后一帧数据大小
                 printf("The lengths of the data are not equal \n");
                 debounce_time=0;
                 restore_screen_brightness();
-            }else{
-                result = memcmp(prev_dis_buf, dis_buf, dis_buf_size);
+            }else{      
+                result = memcmp(prev_dis_buf, dis_buf, dis_buf_size);   
                 if (result == 0) {
                     printf("Previous and current frame data are equal\n");
                     debounce_time++;
-                } else {
+                } else {    //前一帧数据内容 不等于 后一帧数据内容
                     printf("Previous and current frame data differ\n");
                     debounce_time=0;
                     restore_screen_brightness();
@@ -513,10 +507,10 @@ static void *blackout_check_thread(void *arg)
             free(dis_buf);
             dis_buf=NULL;
         }
-        if(debounce_time >= 3){
+        if(debounce_time >= 3){ //判定是暂停状态
             printf("Paused state:\n");
             debounce_time=0;
-            is_black();
+            is_black();     //判断是不是黑场
         }
         sleep(FRAME_DELAY);      
     }
@@ -524,7 +518,7 @@ static void *blackout_check_thread(void *arg)
         return NULL;
 }
 
-static int initialize_blackout_detection(int argc, char *argv[])
+int initialize_blackout_detection(int argc, char *argv[])   //黑场检测初始化
 {
     int ret=0;
     ret = sem_init(&blackout_thread_wait_sem, 0, 0);
@@ -546,17 +540,20 @@ static int initialize_blackout_detection(int argc, char *argv[])
     }    
 }
 
-static int blackout_check_start(int argc, char *argv[])
+int blackout_check_start(int argc, char *argv[])    //黑场检测开始
 {
     blackout_check_thread_wake_flag=true;
     sem_post(&blackout_thread_wait_sem);
 }
 
-static int blackout_check_stop(int argc, char *argv[])
+int blackout_check_stop(int argc, char *argv[])     //黑场检测停止
 {
     blackout_check_thread_wake_flag=false;
     restore_screen_brightness();
 }
-CONSOLE_CMD(blackout_check_stop,NULL,  blackout_check_stop, CONSOLE_CMD_MODE_SELF, "Cut the dis layer diagram and generate bmp images")
-CONSOLE_CMD(blackout_check_start,NULL,  blackout_check_start, CONSOLE_CMD_MODE_SELF, "Cut the dis layer diagram and generate bmp images")
-CONSOLE_CMD(initialize_blackout_detection,NULL,  initialize_blackout_detection, CONSOLE_CMD_MODE_SELF, "Cut the dis layer diagram and generate bmp images")
+
+#ifdef __HCRTOS__          
+CONSOLE_CMD(blackout_check_stop,NULL,  blackout_check_stop, CONSOLE_CMD_MODE_SELF, "CBlack field detection stopped")
+CONSOLE_CMD(blackout_check_start,NULL,  blackout_check_start, CONSOLE_CMD_MODE_SELF, "Black field detection start")
+CONSOLE_CMD(initialize_blackout_detection,NULL,  initialize_blackout_detection, CONSOLE_CMD_MODE_SELF, "The black field detection is initialized")
+#endif
