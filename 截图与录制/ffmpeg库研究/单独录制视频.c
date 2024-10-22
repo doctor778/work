@@ -2,6 +2,11 @@
 	使用步骤：
 	命令行输入 get_buf /media/sda1/1.jpg  得到jpg数据
 	命令行输入 recorded_vidio /media/sda1/1.avi 得到录制的avi文件
+
+备注：视频格式是mjpg，需要支持mjpg格式的视频编码器；容器是avi，需要支持avi容器
+make menuconfig ->Components  --->  -*- ffmpeg  ---> (mjpeg ) Enabled encoders 
+						     (avi) Enabled muxers 
+编译：make ffmpeg-rebuild all
 */
 
 static unsigned char* jpg_buffer=NULL;
