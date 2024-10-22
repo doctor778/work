@@ -2,6 +2,11 @@
 	使用步骤：
 	命令行输入 get_pcm /media/sda1/1.pcm  得到pcm数据
 	命令行输入 recorded_audio /media/sda1/1.avi 得到录制的avi文件
+ 
+备注：音频格式是PCM_S16LE，需要支持PCM_S16LE格式的音频编码器；容器是avi，需要支持avi容器
+make menuconfig ->Components  --->  -*- ffmpeg  ---> (pcm_s16le) Enabled encoders
+						     (avi) Enabled muxers 
+编译：make ffmpeg-rebuild all
 */
 
 static  uint8_t* pcm_pkg=NULL;
