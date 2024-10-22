@@ -1,3 +1,10 @@
+/*
+备注：容器是avi，需要支持avi容器
+make menuconfig ->Components  --->  -*- ffmpeg  ---> (avi) Enabled muxers 
+编译：make ffmpeg-rebuild all
+
+*/
+
 #define AVI_HEADER_SIZE 64
 #define AVI_STREAM_HEADER_SIZE 64
 #define FORMAT_HEADER_SIZE 40
